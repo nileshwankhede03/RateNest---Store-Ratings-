@@ -181,14 +181,31 @@ function StoreForm({ onClose, onSaved }) {
     </Modal>
   );
 }
+
 export function UsersPage() {
-  const [search, setSearch] = useState(''),
-    [role, setRole] = useState(''),
-    [modal, setModal] = useState(false);
-  const { items, error, loading, reload } = useLoad(
-    () => api.getUsers({ search, role }),
-    [search, role],
-  );
+  const [search, setSearch] = useState('');
+  const [role, setRole] = useState('');
+  const [modal, setModal] = useState(false);
+
+  // Fetch all users once
+  const { items, error, loading, reload } = useLoad(() => api.getUsers(), []);
+
+  // Client-side search and role filtering
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredUsers = items.filter((user) => {
+    const matchesSearch = [user.name, user.email, user.address, user.id].some(
+      (value) =>
+        String(value ?? '')
+          .toLowerCase()
+          .includes(normalizedSearch),
+    );
+
+    const matchesRole = !role || user.role === role;
+
+    return matchesSearch && matchesRole;
+  });
+
   return (
     <>
       <div className="page-title-row">
@@ -199,19 +216,23 @@ export function UsersPage() {
             Manage normal users, store owners, and administrators.
           </p>
         </div>
+
         <button className="btn btn-primary" onClick={() => setModal(true)}>
           ＋ Add user
         </button>
       </div>
+
       <div className="toolbar">
         <div className="search-box">
           <span>⌕</span>
           <input
+            type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, email or address…"
+            placeholder="Search by name, email or address..."
           />
         </div>
+
         <select
           className="input filter-select"
           value={role}
@@ -222,12 +243,43 @@ export function UsersPage() {
           <option value="OWNER">Store owner</option>
           <option value="ADMIN">Administrator</option>
         </select>
-        <span className="result-count">{items.length} users</span>
+
+        <span className="result-count">{filteredUsers.length} users</span>
       </div>
+
       {error && <div className="alert alert-error">{error}</div>}
+
       <section className="panel">
         {loading ? (
-          <div className="loading-card">Loading users…</div>
+          <div className="loading-card">Loading users...</div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">⌕</div>
+
+            <h3>
+              {search.trim() || role
+                ? 'No matching users found'
+                : 'No users available'}
+            </h3>
+
+            <p>
+              {search.trim() || role
+                ? `We couldn't find any users matching your search or selected role. Try different filters.`
+                : 'There are no registered users yet.'}
+            </p>
+
+            {(search || role) && (
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  setSearch('');
+                  setRole('');
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -240,35 +292,39 @@ export function UsersPage() {
                   <th>User ID</th>
                 </tr>
               </thead>
+
               <tbody>
-                {items.map((u, i) => (
-                  <tr key={u.id ?? i}>
+                {filteredUsers.map((user, index) => (
+                  <tr key={user.id ?? index}>
                     <td className="person-cell">
                       <span className="avatar avatar-table">
-                        {(u.name || 'U').slice(0, 1).toUpperCase()}
+                        {(user.name || 'U').slice(0, 1).toUpperCase()}
                       </span>
-                      {u.name || '—'}
+                      {user.name || '—'}
                     </td>
-                    <td>{u.email || '—'}</td>
-                    <td className="address-cell">{u.address || '—'}</td>
+
+                    <td>{user.email || '—'}</td>
+
+                    <td className="address-cell">{user.address || '—'}</td>
+
                     <td>
-                      <span className="role-pill">{roleLabel(u.role)}</span>
+                      <span className="role-pill">{roleLabel(user.role)}</span>
                     </td>
-                    <td>{u.id ?? '—'}</td>
+
+                    <td>{user.id ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!items.length && (
-              <div className="empty-inline">No users found.</div>
-            )}
           </div>
         )}
       </section>
+
       {modal && <UserForm onClose={() => setModal(false)} onSaved={reload} />}
     </>
   );
 }
+
 export function StoresPage() {
   const [search, setSearch] = useState(''),
     [modal, setModal] = useState(false);
@@ -276,6 +332,19 @@ export function StoresPage() {
     () => api.getStoresAdmin({ search }),
     [search],
   );
+
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredStores = normalizedSearch
+    ? items.filter((store) =>
+        [store.name, store.store_name, store.email, store.address].some(
+          (value) =>
+            String(value || '')
+              .toLowerCase()
+              .includes(normalizedSearch),
+        ),
+      )
+    : items;
+
   return (
     <>
       <div className="page-title-row">
@@ -290,6 +359,7 @@ export function StoresPage() {
           ＋ Add store
         </button>
       </div>
+
       <div className="toolbar">
         <div className="search-box">
           <span>⌕</span>
@@ -299,12 +369,33 @@ export function StoresPage() {
             placeholder="Search stores by name, email or address…"
           />
         </div>
-        <span className="result-count">{items.length} stores</span>
+        <span className="result-count">{filteredStores.length} stores</span>
       </div>
+
       {error && <div className="alert alert-error">{error}</div>}
+
       <section className="panel">
         {loading ? (
           <div className="loading-card">Loading stores…</div>
+        ) : filteredStores.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">⌕</div>
+            <h3>
+              {normalizedSearch
+                ? 'No matching stores found'
+                : 'No stores added yet'}
+            </h3>
+            <p>
+              {normalizedSearch
+                ? `We couldn't find any stores matching “${search.trim()}”. Try a different name, email or address.`
+                : 'Add your first store to get started.'}
+            </p>
+            {normalizedSearch && (
+              <button className="btn btn-outline" onClick={() => setSearch('')}>
+                Clear search
+              </button>
+            )}
+          </div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -317,31 +408,36 @@ export function StoresPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((s, i) => (
-                  <tr key={s.id ?? i}>
+                {filteredStores.map((store, i) => (
+                  <tr key={store.id ?? store.store_id ?? i}>
                     <td className="person-cell">
                       <span className="store-avatar small-store">
-                        {(s.name || 'S').slice(0, 1).toUpperCase()}
+                        {(store.name || store.store_name || 'S')
+                          .slice(0, 1)
+                          .toUpperCase()}
                       </span>
-                      {s.name || '—'}
+                      {store.name || store.store_name || '—'}
                     </td>
-                    <td>{s.email || '—'}</td>
-                    <td className="address-cell">{s.address || '—'}</td>
+                    <td>{store.email || '—'}</td>
+                    <td className="address-cell">{store.address || '—'}</td>
                     <td>
                       <span className="rating-number">
-                        ★ {s.average_rating ?? s.rating ?? '—'}
+                        ★{' '}
+                        {store.averageRating ??
+                          store.average_rating ??
+                          store.overallRating ??
+                          store.rating ??
+                          '—'}
                       </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!items.length && (
-              <div className="empty-inline">No stores found.</div>
-            )}
           </div>
         )}
       </section>
+
       {modal && <StoreForm onClose={() => setModal(false)} onSaved={reload} />}
     </>
   );

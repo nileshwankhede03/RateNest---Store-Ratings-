@@ -115,42 +115,65 @@ exports.login = async (req, res) => {
 
 exports.updatePassword = async (req, res) => {
   try {
-    const { oldPassword, newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
 
+    // Validate required fields
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: 'Current password and new password are required',
+      });
+    }
+
+    // Validate new password
     if (
-      !newPassword ||
       newPassword.length < 8 ||
       newPassword.length > 16 ||
       !/[A-Z]/.test(newPassword) ||
       !/[^A-Za-z0-9]/.test(newPassword)
     ) {
       return res.status(400).json({
-        message: 'Invalid new password format',
+        message:
+          'Password must be 8-16 characters with uppercase and special character',
       });
     }
 
+    // Get logged-in user
     const [users] = await db.query('SELECT password FROM users WHERE id = ?', [
       req.user.id,
     ]);
 
-    if (
-      !users.length ||
-      !(await bcrypt.compare(oldPassword, users[0].password))
-    ) {
-      return res.status(400).json({
-        message: 'Old password is incorrect',
+    if (!users.length) {
+      return res.status(404).json({
+        message: 'User not found',
       });
     }
 
-    const hashed = await bcrypt.hash(newPassword, 10);
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, users[0].password);
 
+    if (!isMatch) {
+      return res.status(400).json({
+        message: 'Current password is incorrect',
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update database
     await db.query('UPDATE users SET password = ? WHERE id = ?', [
-      hashed,
+      hashedPassword,
       req.user.id,
     ]);
 
-    res.json({ message: 'Password updated successfully' });
+    return res.status(200).json({
+      message: 'Password updated successfully',
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Update password error:', error);
+
+    return res.status(500).json({
+      message: 'Unable to update password. Please try again.',
+    });
   }
 };

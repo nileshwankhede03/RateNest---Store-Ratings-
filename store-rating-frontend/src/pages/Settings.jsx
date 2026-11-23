@@ -2,16 +2,20 @@ import React, { useState } from 'react';
 import Field from '../components/Field';
 import { api } from '../services/api';
 import { getErrorMessage, validatePassword } from '../utils';
+
 export default function Settings() {
   const [f, setF] = useState({
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
     }),
+    
     [error, setError] = useState(''),
     [success, setSuccess] = useState(''),
     [busy, setBusy] = useState(false);
+
   const change = (e) => setF({ ...f, [e.target.name]: e.target.value });
+
   const submit = async (e) => {
     e.preventDefault();
     setError('');
