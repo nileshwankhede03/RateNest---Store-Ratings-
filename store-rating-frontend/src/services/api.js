@@ -27,7 +27,7 @@ export async function request(path, options = {}) {
     });
   } catch {
     throw new Error(
-      `Cannot reach API at ${API_BASE}. Check that your Express server is running and the port is correct.`,
+      `Cannot reach API. Check that your Express server is running and the port is correct.`,
     );
   }
 
@@ -45,7 +45,7 @@ export async function request(path, options = {}) {
       data?.error ||
       (typeof data === 'string' ? data : '') ||
       `Request failed (${response.status})`;
-    throw new Error(`${message} [${response.status}]`);
+    throw new Error(`${message}`);
   }
   return data;
 }
@@ -54,7 +54,7 @@ export const api = {
   health: () =>
     fetch(API_BASE.replace(/\/api$/, '/')).then(async (r) => {
       const t = await r.text();
-      if (!r.ok) throw new Error(`API health check failed (${r.status})`);
+      if (!r.ok) throw new Error(`API health check failed`);
       return t;
     }),
   signup: (body) =>

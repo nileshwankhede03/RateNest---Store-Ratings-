@@ -6,19 +6,11 @@ import { StoresPage, UsersPage } from './pages/Admin';
 import Settings from './pages/Settings';
 import Shell from './components/Shell';
 
-/**
- * Keep all session-dependent reads inside this component.
- * Route JSX is evaluated before a wrapper's children are rendered, so
- * writing session.user directly inside <Protected> previously crashed
- * when the app first loaded with session === null.
- */
 function PrivateRoute({ session, onLogout, Page, adminOnly = false }) {
   if (!session?.token) {
     return <Navigate to="/login" replace />;
   }
 
-  // A token can exist without a parsed user object in older/local sessions.
-  // Keep the layout safe and let role-based pages handle a missing role.
   const user = session.user || {};
   const role = String(user.role || '').toUpperCase();
 
@@ -37,13 +29,20 @@ export default function App() {
   const [session, setSession] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('sr_session') || 'null');
+      if (stored?.token) {
+        localStorage.setItem('sr_token', stored.token);
+      }
       return stored && typeof stored === 'object' ? stored : null;
     } catch {
+      localStorage.removeItem('sr_session');
+      localStorage.removeItem('sr_token');
       return null;
     }
   });
+
   const navigate = useNavigate();
 
+  // Keep the persisted session in sync with React state.
   useEffect(() => {
     if (session?.token) {
       localStorage.setItem('sr_session', JSON.stringify(session));
@@ -54,9 +53,23 @@ export default function App() {
     }
   }, [session]);
 
-  const login = ({ token, user }) => setSession({ token, user: user || {} });
+  const login = ({ token, user }) => {
+    if (!token) {
+      throw new Error(
+        'Login response did not include an authentication token.',
+      );
+    }
+
+    const nextSession = { token, user: user || {} };
+
+    localStorage.setItem('sr_session', JSON.stringify(nextSession));
+    localStorage.setItem('sr_token', token);
+    setSession(nextSession);
+  };
 
   const logout = () => {
+    localStorage.removeItem('sr_session');
+    localStorage.removeItem('sr_token');
     setSession(null);
     navigate('/login', { replace: true });
   };
